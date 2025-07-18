@@ -4,6 +4,7 @@
   "dependencies": {
     "stripe": "^13.0.0",
     "axios": "^1.4.0",
-    "micro": "^10.0.0"
+    "micro": "^10.0.0",
+    "node-fetch": "^3.3.1"
   }
 }
