@@ -89,112 +89,54 @@ export default async function handler(req, res) {
 
 async function addToWixContacts(customerData) {
   try {
-    // Use Query Contacts API to search for existing contact
-    const searchResponse = await fetch(`https://www.wixapis.com/crm/v3/contacts/query`, {
+    console.log('Attempting to create contact in Wix with data:', customerData);
+    
+    // Try to create new contact directly (simplified test)
+    const contactData = {
+      info: {
+        name: {
+          first: customerData.firstName,
+          last: customerData.lastName
+        },
+        emails: [
+          {
+            email: customerData.email,
+            primary: true
+          }
+        ],
+        phones: customerData.phone ? [
+          {
+            phone: customerData.phone,
+            primary: true
+          }
+        ] : [],
+        labelKeys: ["Stripe MTHD RT 2025"]
+      }
+    };
+
+    console.log('Contact data to send:', JSON.stringify(contactData, null, 2));
+
+    const createResponse = await fetch('https://www.wixapis.com/crm/v3/contacts', {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${process.env.WIX_API_KEY}`,
         'Content-Type': 'application/json',
         'wix-site-id': process.env.WIX_SITE_ID
       },
-      body: JSON.stringify({
-        filter: {
-          "info.emails.email": {
-            "$eq": customerData.email
-          }
-        }
-      })
+      body: JSON.stringify(contactData)
     });
 
-    if (!searchResponse.ok) {
-      const errorData = await searchResponse.text();
-      console.log('Wix search error details:', errorData);
-      throw new Error(`Wix search error: ${searchResponse.status} - ${errorData}`);
+    console.log('Create response status:', createResponse.status);
+    
+    if (!createResponse.ok) {
+      const errorData = await createResponse.text();
+      console.log('Wix create error details:', errorData);
+      throw new Error(`Wix create error: ${createResponse.status} - ${errorData}`);
     }
 
-    const searchResult = await searchResponse.json();
-    const existingContact = searchResult.contacts && searchResult.contacts.length > 0 ? searchResult.contacts[0] : null;
-
-    if (existingContact) {
-      // Update existing contact - add the label if not already present
-      const currentLabels = existingContact.info.labelKeys || [];
-      const newLabel = "Stripe MTHD RT 2025";
-      
-      if (!currentLabels.includes(newLabel)) {
-        currentLabels.push(newLabel);
-        
-        const updateData = {
-          info: {
-            labelKeys: currentLabels
-          }
-        };
-
-        const updateResponse = await fetch(`https://www.wixapis.com/crm/v3/contacts/${existingContact.id}`, {
-          method: 'PATCH',
-          headers: {
-            'Authorization': `Bearer ${process.env.WIX_API_KEY}`,
-            'Content-Type': 'application/json',
-            'wix-site-id': process.env.WIX_SITE_ID
-          },
-          body: JSON.stringify(updateData)
-        });
-
-        if (!updateResponse.ok) {
-          const errorData = await updateResponse.text();
-          throw new Error(`Wix update error: ${updateResponse.status} - ${errorData}`);
-        }
-
-        const result = await updateResponse.json();
-        console.log('Updated existing contact in Wix:', result);
-        return result;
-      } else {
-        console.log('Contact already has the label, no update needed');
-        return { message: 'Contact already tagged' };
-      }
-    } else {
-      // Create new contact
-      const contactData = {
-        info: {
-          name: {
-            first: customerData.firstName,
-            last: customerData.lastName
-          },
-          emails: [
-            {
-              email: customerData.email,
-              primary: true
-            }
-          ],
-          phones: customerData.phone ? [
-            {
-              phone: customerData.phone,
-              primary: true
-            }
-          ] : [],
-          labelKeys: ["Stripe MTHD RT 2025"]
-        }
-      };
-
-      const createResponse = await fetch('https://www.wixapis.com/crm/v3/contacts', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${process.env.WIX_API_KEY}`,
-          'Content-Type': 'application/json',
-          'wix-site-id': process.env.WIX_SITE_ID
-        },
-        body: JSON.stringify(contactData)
-      });
-
-      if (!createResponse.ok) {
-        const errorData = await createResponse.text();
-        console.log('Wix create error details:', errorData);
-        throw new Error(`Wix create error: ${createResponse.status} - ${errorData}`);
-      }
-
-      const result = await createResponse.json();
-      console.log('Created new contact in Wix:', result);
-      return result;
-    }
+    const result = await createResponse.json();
+    console.log('Created contact in Wix:', result);
+    return result;
     
   } catch (error) {
     console.error('Error managing contact in Wix:', error);
