@@ -1,11 +1,10 @@
 // api/stripe-webhook.js
 
-// Configure this function to receive raw body
 export const config = {
   api: {
     bodyParser: false,
   },
-}
+};
 
 const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 
@@ -25,17 +24,15 @@ function getRawBody(req) {
 }
 
 export default async function handler(req, res) {
-  // Only allow POST requests
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
   try {
-    // Get raw body for signature verification
     const rawBody = await getRawBody(req);
     const sig = req.headers['stripe-signature'];
     const endpointSecret = process.env.STRIPE_WEBHOOK_SECRET;
-    
+
     let event;
     try {
       event = stripe.webhooks.constructEvent(rawBody, sig, endpointSecret);
@@ -44,46 +41,40 @@ export default async function handler(req, res) {
       return res.status(400).send(`Webhook Error: ${err.message}`);
     }
 
-    // Handle the checkout.session.completed event
     if (event.type === 'checkout.session.completed') {
       const session = event.data.object;
-      
-      // TEMPORARY: Skip product filtering for testing
+
       console.log('Webhook received for session:', session.id);
       console.log('Customer email:', session.customer_email || session.customer_details?.email);
-      
-      // Extract customer information
+
       const customerEmail = session.customer_email || session.customer_details?.email;
       const customerName = session.customer_details?.name;
-      
-      // Extract last name from custom fields
+
       let lastName = '';
       if (session.custom_fields && session.custom_fields.length > 0) {
-        const lastNameField = session.custom_fields.find(field => 
+        const lastNameField = session.custom_fields.find(field =>
           field.key === 'firstname' || field.label?.custom === 'Last name'
         );
         if (lastNameField && lastNameField.text) {
           lastName = lastNameField.text.value || '';
         }
       }
-      
+
       if (!customerEmail) {
         console.log('No customer email found in session');
         return res.status(400).json({ error: 'No customer email' });
       }
 
-      // Use the name from customer_details as first name, custom field as last name
       const firstName = customerName || '';
-      
+
       console.log('Extracted names - First:', firstName, 'Last:', lastName);
 
-      // Add to Wix
       await addToWixContacts({
         email: customerEmail,
         firstName: firstName,
         lastName: lastName,
         phone: session.customer_details?.phone || '',
-        purchaseAmount: session.amount_total / 100, // Convert from cents
+        purchaseAmount: session.amount_total / 100,
         purchaseDate: new Date().toISOString(),
         stripeSessionId: session.id
       });
@@ -101,35 +92,33 @@ export default async function handler(req, res) {
 async function addToWixContacts(customerData) {
   try {
     console.log('Attempting to create contact in Wix with data:', customerData);
-    
-    // Create minimal contact with only required fields
+
     const contactData = {
-      info: {
-        emails: [
-          {
-            email: customerData.email,
-            primary: true
-          }
-        ],
-        labelKeys: ["Stripe MTHD RT 2025"]
+      contact: {
+        info: {
+          emails: [
+            {
+              email: customerData.email,
+              primary: true
+            }
+          ],
+          labelKeys: ["Stripe MTHD RT 2025"]
+        }
       }
     };
 
-    // Only add name if we have it
     if (customerData.firstName) {
-      contactData.info.name = {
+      contactData.contact.info.name = {
         first: customerData.firstName
       };
-      
-      // Only add last name if we have it
+
       if (customerData.lastName) {
-        contactData.info.name.last = customerData.lastName;
+        contactData.contact.info.name.last = customerData.lastName;
       }
     }
 
-    // Only add phone if we have it
     if (customerData.phone) {
-      contactData.info.phones = [
+      contactData.contact.info.phones = [
         {
           phone: customerData.phone,
           primary: true
@@ -150,7 +139,7 @@ async function addToWixContacts(customerData) {
     });
 
     console.log('Create response status:', createResponse.status);
-    
+
     if (!createResponse.ok) {
       const errorData = await createResponse.text();
       console.log('Wix create error details:', errorData);
@@ -160,7 +149,7 @@ async function addToWixContacts(customerData) {
     const result = await createResponse.json();
     console.log('Created contact in Wix:', result);
     return result;
-    
+
   } catch (error) {
     console.error('Error managing contact in Wix:', error);
     throw error;
