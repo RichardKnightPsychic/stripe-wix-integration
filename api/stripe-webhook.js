@@ -24,6 +24,24 @@ export default async function handler(req, res) {
     if (event.type === 'checkout.session.completed') {
       const session = event.data.object;
       
+      // Check if this purchase is for the Revolutionary Tarot product
+      const targetProductId = 'prod_Shc5isiU1QCROZ';
+      
+      // Get line items to check the product
+      const lineItems = await stripe.checkout.sessions.listLineItems(session.id, {
+        expand: ['data.price.product']
+      });
+      
+      // Check if any line item matches our target product
+      const hasTargetProduct = lineItems.data.some(item => 
+        item.price.product.id === targetProductId
+      );
+      
+      if (!hasTargetProduct) {
+        console.log('Purchase does not include Revolutionary Tarot product, skipping');
+        return res.status(200).json({ received: true, skipped: 'Not target product' });
+      }
+      
       // Extract customer information
       const customerEmail = session.customer_email || session.customer_details?.email;
       const customerName = session.customer_details?.name;
@@ -49,7 +67,7 @@ export default async function handler(req, res) {
         stripeSessionId: session.id
       });
 
-      console.log('Successfully added customer to Wix:', customerEmail);
+      console.log('Successfully added Revolutionary Tarot customer to Wix:', customerEmail);
     }
 
     res.status(200).json({ received: true });
@@ -80,7 +98,7 @@ async function addToWixContacts(customerData) {
             primary: true
           }
         ] : [],
-        labelKeys: ["stripe-customer"]
+        labelKeys: ["Stripe MTHD RT 2025"]
       }
     };
 
