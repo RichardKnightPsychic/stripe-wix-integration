@@ -115,7 +115,7 @@ async function addToWixContacts(customerData) {
       }
     }
 
-    if (customerData.phone) {
+    if (customerData.phone && customerData.phone.trim() !== '') {
       contactData.contact.info.phones = [
         {
           phone: customerData.phone,
