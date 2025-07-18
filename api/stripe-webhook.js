@@ -1,5 +1,3 @@
-// api/stripe-webhook.js
-
 export const config = {
   api: {
     bodyParser: false,
@@ -102,8 +100,8 @@ async function addToWixContacts(customerData) {
               primary: true
             }
           ],
-          labelKeys: ["Stripe MTHD RT 2025"]
-        }
+        },
+        labels: ["Stripe MTHD RT 2025"]
       }
     };
 
