@@ -1,61 +1,50 @@
-// stripe-webhook.js
-const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
-const axios = require('axios');  // Correct import for axios
+import axios from 'axios';
 
-// Handler function
-module.exports.handler = async function(event) {
+export default async function handler(req, res) {
   try {
-    console.info('Webhook received:', event);
-
-    // Parse Stripe session info (adjust based on your actual event structure)
-    const session = JSON.parse(event.body);
-
-    const email = session.customer_details?.email || '';
-    const firstName = session.customer_details?.name?.split(' ')[0] || '';
-    const lastName = session.customer_details?.name?.split(' ').slice(1).join(' ') || '';
-    const purchaseDate = new Date().toISOString();
-    const stripeSessionId = session.id || '';
-
-    if (!email) {
-      console.error('Email is missing in Stripe session.');
-      return { statusCode: 400, body: 'Email missing' };
+    if (req.method !== 'POST') {
+      return res.status(405).send('Method Not Allowed');
     }
 
-    // Build contact data for Wix API
+    const event = req.body;
+
+    // Extract customer info example:
+    const email = event.data?.object?.customer_email || '';
+    const firstName = event.data?.object?.customer_details?.first_name || 'First';
+    const lastName = event.data?.object?.customer_details?.last_name || 'Last';
+
     const contactData = {
       contact: {
         info: {
-          emails: [{ email, primary: true }],
-          name: { first: firstName, last: lastName },
+          emails: [
+            {
+              email: email,
+              primary: true,
+            },
+          ],
+          name: {
+            first: firstName,
+            last: lastName,
+          },
         },
         labels: ['Stripe MTHD RT 2025'],
       },
     };
 
-    // Call Wix API to create contact
-    const wixResponse = await axios.post(
-      'https://www.wixapis.com/contacts/v4/contacts',
-      contactData,
-      {
-        headers: {
-          Authorization: `Bearer ${process.env.WIX_API_KEY}`,
-          'Content-Type': 'application/json',
-          'wix-site-id': process.env.WIX_SITE_ID,
-        },
-      }
-    );
+    // Replace with your Wix API URL and auth
+    const wixUrl = 'https://www.wixapis.com/crm/v1/contacts';
+    const wixApiKey = process.env.WIX_API_KEY;
 
-    console.info('Wix API response status:', wixResponse.status);
+    const response = await axios.post(wixUrl, contactData, {
+      headers: {
+        Authorization: `Bearer ${wixApiKey}`,
+        'Content-Type': 'application/json',
+      },
+    });
 
-    return {
-      statusCode: 200,
-      body: JSON.stringify({ message: 'Contact created successfully' }),
-    };
+    return res.status(200).json({ success: true, data: response.data });
   } catch (error) {
-    console.error('Error in webhook handler:', error.message || error);
-    return {
-      statusCode: 500,
-      body: JSON.stringify({ error: error.message || 'Internal Server Error' }),
-    };
+    console.error('Webhook error:', error);
+    return res.status(500).json({ error: error.message });
   }
-};
+}
