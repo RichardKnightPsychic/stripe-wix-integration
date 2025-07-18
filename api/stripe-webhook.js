@@ -1,7 +1,6 @@
 // api/stripe-webhook.js
 
 import Stripe from 'stripe';
-import { buffer } from 'micro';
 import axios from 'axios';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
@@ -13,6 +12,21 @@ export const config = {
     bodyParser: false,
   },
 };
+
+function getRawBody(req) {
+  return new Promise((resolve, reject) => {
+    let buffer = '';
+    req.on('data', (chunk) => {
+      buffer += chunk;
+    });
+    req.on('end', () => {
+      resolve(buffer);
+    });
+    req.on('error', (error) => {
+      reject(error);
+    });
+  });
+}
 
 const addToWixContacts = async (customerData) => {
   const { email, firstName, lastName } = customerData;
@@ -30,7 +44,7 @@ const addToWixContacts = async (customerData) => {
           first: firstName,
           last: lastName,
         },
-        phones: [], // ✅ Must be present to avoid "info must not be empty"
+        phones: [], // Must be present to avoid "info must not be empty"
       },
       labels: ["Stripe MTHD RT 2025"],
     },
@@ -46,6 +60,7 @@ const addToWixContacts = async (customerData) => {
         headers: {
           Authorization: process.env.WIX_API_KEY,
           'Content-Type': 'application/json',
+          'wix-site-id': process.env.WIX_SITE_ID,
         },
       }
     );
@@ -62,7 +77,7 @@ const handler = async (req, res) => {
     return res.status(405).end('Method Not Allowed');
   }
 
-  const buf = await buffer(req);
+  const buf = await getRawBody(req);
   const sig = req.headers['stripe-signature'];
 
   let event;
