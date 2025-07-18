@@ -89,8 +89,8 @@ export default async function handler(req, res) {
 
 async function addToWixContacts(customerData) {
   try {
-    // First, search for existing contact with this email
-    const searchResponse = await fetch(`https://www.wixapis.com/crm/v3/contacts/search`, {
+    // Use Query Contacts API to search for existing contact
+    const searchResponse = await fetch(`https://www.wixapis.com/crm/v3/contacts/query`, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${process.env.WIX_API_KEY}`,
@@ -98,11 +98,9 @@ async function addToWixContacts(customerData) {
         'wix-site-id': process.env.WIX_SITE_ID
       },
       body: JSON.stringify({
-        search: {
-          filter: {
-            "info.emails.email": {
-              "$eq": customerData.email
-            }
+        filter: {
+          "info.emails.email": {
+            "$eq": customerData.email
           }
         }
       })
@@ -110,6 +108,7 @@ async function addToWixContacts(customerData) {
 
     if (!searchResponse.ok) {
       const errorData = await searchResponse.text();
+      console.log('Wix search error details:', errorData);
       throw new Error(`Wix search error: ${searchResponse.status} - ${errorData}`);
     }
 
@@ -129,15 +128,6 @@ async function addToWixContacts(customerData) {
             labelKeys: currentLabels
           }
         };
-
-        // Add custom fields
-        if (customerData.purchaseAmount) {
-          updateData.info.extendedFields = {
-            "custom.lastPurchaseAmount": customerData.purchaseAmount.toString(),
-            "custom.lastPurchaseDate": customerData.purchaseDate,
-            "custom.stripeSessionId": customerData.stripeSessionId
-          };
-        }
 
         const updateResponse = await fetch(`https://www.wixapis.com/crm/v3/contacts/${existingContact.id}`, {
           method: 'PATCH',
@@ -185,15 +175,6 @@ async function addToWixContacts(customerData) {
         }
       };
 
-      // Add custom fields
-      if (customerData.purchaseAmount) {
-        contactData.info.extendedFields = {
-          "custom.lastPurchaseAmount": customerData.purchaseAmount.toString(),
-          "custom.lastPurchaseDate": customerData.purchaseDate,
-          "custom.stripeSessionId": customerData.stripeSessionId
-        };
-      }
-
       const createResponse = await fetch('https://www.wixapis.com/crm/v3/contacts', {
         method: 'POST',
         headers: {
@@ -206,6 +187,7 @@ async function addToWixContacts(customerData) {
 
       if (!createResponse.ok) {
         const errorData = await createResponse.text();
+        console.log('Wix create error details:', errorData);
         throw new Error(`Wix create error: ${createResponse.status} - ${errorData}`);
       }
 
