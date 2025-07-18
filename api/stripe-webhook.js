@@ -1,5 +1,28 @@
 // api/stripe-webhook.js
+
+// Configure this function to receive raw body
+export const config = {
+  api: {
+    bodyParser: false,
+  },
+}
+
 const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
+
+function getRawBody(req) {
+  return new Promise((resolve, reject) => {
+    let buffer = '';
+    req.on('data', (chunk) => {
+      buffer += chunk;
+    });
+    req.on('end', () => {
+      resolve(buffer);
+    });
+    req.on('error', (error) => {
+      reject(error);
+    });
+  });
+}
 
 export default async function handler(req, res) {
   // Only allow POST requests
@@ -8,13 +31,14 @@ export default async function handler(req, res) {
   }
 
   try {
-    // Verify webhook signature
+    // Get raw body for signature verification
+    const rawBody = await getRawBody(req);
     const sig = req.headers['stripe-signature'];
     const endpointSecret = process.env.STRIPE_WEBHOOK_SECRET;
     
     let event;
     try {
-      event = stripe.webhooks.constructEvent(req.body, sig, endpointSecret);
+      event = stripe.webhooks.constructEvent(rawBody, sig, endpointSecret);
     } catch (err) {
       console.log(`Webhook signature verification failed.`, err.message);
       return res.status(400).send(`Webhook Error: ${err.message}`);
