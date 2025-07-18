@@ -102,29 +102,40 @@ async function addToWixContacts(customerData) {
   try {
     console.log('Attempting to create contact in Wix with data:', customerData);
     
-    // Try to create new contact with correct format
+    // Create minimal contact with only required fields
     const contactData = {
       info: {
-        name: {
-          first: customerData.firstName,
-          last: customerData.lastName
-        },
         emails: [
           {
             email: customerData.email,
             primary: true
           }
         ],
-        phones: customerData.phone ? [
-          {
-            phone: customerData.phone,
-            primary: true
-          }
-        ] : [],
         labelKeys: ["Stripe MTHD RT 2025"]
-      },
-      allowDuplicates: true
+      }
     };
+
+    // Only add name if we have it
+    if (customerData.firstName) {
+      contactData.info.name = {
+        first: customerData.firstName
+      };
+      
+      // Only add last name if we have it
+      if (customerData.lastName) {
+        contactData.info.name.last = customerData.lastName;
+      }
+    }
+
+    // Only add phone if we have it
+    if (customerData.phone) {
+      contactData.info.phones = [
+        {
+          phone: customerData.phone,
+          primary: true
+        }
+      ];
+    }
 
     console.log('Contact data to send:', JSON.stringify(contactData, null, 2));
 
