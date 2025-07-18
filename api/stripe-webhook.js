@@ -116,7 +116,7 @@ async function addToWixContacts(customerData) {
 
     console.log('Contact data to send:', JSON.stringify(contactData, null, 2));
 
-    const createResponse = await fetch('https://www.wixapis.com/crm/v3/contacts', {
+    const createResponse = await fetch('https://www.wixapis.com/contacts/v4/contacts', {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${process.env.WIX_API_KEY}`,
