@@ -1,0 +1,1 @@
+# stripe-wix-integration
