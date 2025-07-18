@@ -56,15 +56,26 @@ export default async function handler(req, res) {
       const customerEmail = session.customer_email || session.customer_details?.email;
       const customerName = session.customer_details?.name;
       
+      // Extract last name from custom fields
+      let lastName = '';
+      if (session.custom_fields && session.custom_fields.length > 0) {
+        const lastNameField = session.custom_fields.find(field => 
+          field.key === 'firstname' || field.label?.custom === 'Last name'
+        );
+        if (lastNameField && lastNameField.text) {
+          lastName = lastNameField.text.value || '';
+        }
+      }
+      
       if (!customerEmail) {
         console.log('No customer email found in session');
         return res.status(400).json({ error: 'No customer email' });
       }
 
-      // Split name if available
-      const nameParts = customerName ? customerName.split(' ') : ['', ''];
-      const firstName = nameParts[0] || '';
-      const lastName = nameParts.slice(1).join(' ') || '';
+      // Use the name from customer_details as first name, custom field as last name
+      const firstName = customerName || '';
+      
+      console.log('Extracted names - First:', firstName, 'Last:', lastName);
 
       // Add to Wix
       await addToWixContacts({
@@ -91,7 +102,7 @@ async function addToWixContacts(customerData) {
   try {
     console.log('Attempting to create contact in Wix with data:', customerData);
     
-    // Try to create new contact directly (simplified test)
+    // Try to create new contact with correct format
     const contactData = {
       info: {
         name: {
@@ -111,7 +122,8 @@ async function addToWixContacts(customerData) {
           }
         ] : [],
         labelKeys: ["Stripe MTHD RT 2025"]
-      }
+      },
+      allowDuplicates: true
     };
 
     console.log('Contact data to send:', JSON.stringify(contactData, null, 2));
