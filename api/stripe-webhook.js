@@ -79,60 +79,133 @@ export default async function handler(req, res) {
 
 async function addToWixContacts(customerData) {
   try {
-    // Prepare contact data for Wix Contacts API
-    const contactData = {
-      info: {
-        name: {
-          first: customerData.firstName,
-          last: customerData.lastName
-        },
-        emails: [
-          {
-            email: customerData.email,
-            primary: true
-          }
-        ],
-        phones: customerData.phone ? [
-          {
-            phone: customerData.phone,
-            primary: true
-          }
-        ] : [],
-        labelKeys: ["Stripe MTHD RT 2025"]
-      }
-    };
-
-    // Add custom fields if needed
-    if (customerData.purchaseAmount) {
-      contactData.info.extendedFields = {
-        "custom.lastPurchaseAmount": customerData.purchaseAmount.toString(),
-        "custom.lastPurchaseDate": customerData.purchaseDate,
-        "custom.stripeSessionId": customerData.stripeSessionId
-      };
-    }
-
-    // Create contact in Wix using API key authentication
-    const response = await fetch('https://www.wixapis.com/crm/v3/contacts', {
+    // First, search for existing contact with this email
+    const searchResponse = await fetch(`https://www.wixapis.com/crm/v3/contacts/search`, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${process.env.WIX_API_KEY}`,
         'Content-Type': 'application/json',
         'wix-site-id': process.env.WIX_SITE_ID
       },
-      body: JSON.stringify(contactData)
+      body: JSON.stringify({
+        search: {
+          filter: {
+            "info.emails.email": {
+              "$eq": customerData.email
+            }
+          }
+        }
+      })
     });
 
-    if (!response.ok) {
-      const errorData = await response.text();
-      throw new Error(`Wix API error: ${response.status} - ${errorData}`);
+    if (!searchResponse.ok) {
+      const errorData = await searchResponse.text();
+      throw new Error(`Wix search error: ${searchResponse.status} - ${errorData}`);
     }
 
-    const result = await response.json();
-    console.log('Contact created in Wix:', result);
-    return result;
+    const searchResult = await searchResponse.json();
+    const existingContact = searchResult.contacts && searchResult.contacts.length > 0 ? searchResult.contacts[0] : null;
+
+    if (existingContact) {
+      // Update existing contact - add the label if not already present
+      const currentLabels = existingContact.info.labelKeys || [];
+      const newLabel = "Stripe MTHD RT 2025";
+      
+      if (!currentLabels.includes(newLabel)) {
+        currentLabels.push(newLabel);
+        
+        const updateData = {
+          info: {
+            labelKeys: currentLabels
+          }
+        };
+
+        // Add custom fields
+        if (customerData.purchaseAmount) {
+          updateData.info.extendedFields = {
+            "custom.lastPurchaseAmount": customerData.purchaseAmount.toString(),
+            "custom.lastPurchaseDate": customerData.purchaseDate,
+            "custom.stripeSessionId": customerData.stripeSessionId
+          };
+        }
+
+        const updateResponse = await fetch(`https://www.wixapis.com/crm/v3/contacts/${existingContact.id}`, {
+          method: 'PATCH',
+          headers: {
+            'Authorization': `Bearer ${process.env.WIX_API_KEY}`,
+            'Content-Type': 'application/json',
+            'wix-site-id': process.env.WIX_SITE_ID
+          },
+          body: JSON.stringify(updateData)
+        });
+
+        if (!updateResponse.ok) {
+          const errorData = await updateResponse.text();
+          throw new Error(`Wix update error: ${updateResponse.status} - ${errorData}`);
+        }
+
+        const result = await updateResponse.json();
+        console.log('Updated existing contact in Wix:', result);
+        return result;
+      } else {
+        console.log('Contact already has the label, no update needed');
+        return { message: 'Contact already tagged' };
+      }
+    } else {
+      // Create new contact
+      const contactData = {
+        info: {
+          name: {
+            first: customerData.firstName,
+            last: customerData.lastName
+          },
+          emails: [
+            {
+              email: customerData.email,
+              primary: true
+            }
+          ],
+          phones: customerData.phone ? [
+            {
+              phone: customerData.phone,
+              primary: true
+            }
+          ] : [],
+          labelKeys: ["Stripe MTHD RT 2025"]
+        }
+      };
+
+      // Add custom fields
+      if (customerData.purchaseAmount) {
+        contactData.info.extendedFields = {
+          "custom.lastPurchaseAmount": customerData.purchaseAmount.toString(),
+          "custom.lastPurchaseDate": customerData.purchaseDate,
+          "custom.stripeSessionId": customerData.stripeSessionId
+        };
+      }
+
+      const createResponse = await fetch('https://www.wixapis.com/crm/v3/contacts', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${process.env.WIX_API_KEY}`,
+          'Content-Type': 'application/json',
+          'wix-site-id': process.env.WIX_SITE_ID
+        },
+        body: JSON.stringify(contactData)
+      });
+
+      if (!createResponse.ok) {
+        const errorData = await createResponse.text();
+        throw new Error(`Wix create error: ${createResponse.status} - ${errorData}`);
+      }
+
+      const result = await createResponse.json();
+      console.log('Created new contact in Wix:', result);
+      return result;
+    }
     
   } catch (error) {
-    console.error('Error adding contact to Wix:', error);
+    console.error('Error managing contact in Wix:', error);
     throw error;
   }
 }
