@@ -48,9 +48,19 @@ export default async function handler(req, res) {
     if (event.type === 'checkout.session.completed') {
       const session = event.data.object;
       
-      // TEMPORARY: Skip product filtering for testing
-      console.log('Webhook received for session:', session.id);
-      console.log('Customer email:', session.customer_email || session.customer_details?.email);
+      // Check if this purchase is for Revolutionary Tarot using your custom metadata
+      const isRevolutionaryTarot = session.metadata && 
+        (session.metadata.Label === 'RT2025' || 
+         (session.metadata['Wix Label'] && session.metadata['Wix Label'].includes('Revolutionary Tarot')));
+      
+      if (!isRevolutionaryTarot) {
+        console.log('Purchase is not for Revolutionary Tarot product, skipping');
+        console.log('Found metadata:', session.metadata);
+        return res.status(200).json({ received: true, skipped: 'Not Revolutionary Tarot product' });
+      }
+      
+      console.log('✅ Revolutionary Tarot purchase detected!');
+      console.log('Product metadata:', session.metadata);
       
       // Extract customer information
       const customerEmail = session.customer_email || session.customer_details?.email;
